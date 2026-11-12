@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, Flame, Play } from 'lucide-react';
+import { ChevronRight, Flame, Moon, Play, Smartphone, Sun } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useInProgressSession, useNextDay } from '../store/selectors';
 import {
@@ -17,6 +18,8 @@ import { WeekSlots } from '../components/workout/WeekSlots';
 import { StatTile } from '../components/workout/StatTile';
 import { SessionRow } from '../components/history/SessionRow';
 import { EmptyState } from '../components/ui/EmptyState';
+import { toast } from '../components/ui/Toast';
+import { promptInstall, useInstallStore } from '../pwa/install';
 
 const WEEKDAY_HINT: Record<number, string> = {
   1: 'day-a',
@@ -28,10 +31,35 @@ export function Today() {
   const navigate = useNavigate();
   const sessions = useAppStore((s) => s.sessions);
   const settings = useAppStore((s) => s.settings);
+  const updateSettings = useAppStore((s) => s.updateSettings);
   const safeMode = useAppStore((s) => s.safeMode);
   const program = useAppStore((s) => s.program);
   const next = useNextDay();
   const inProgress = useInProgressSession();
+  const installed = useInstallStore((s) => s.installed);
+
+  const [systemPrefersLight, setSystemPrefersLight] = useState(
+    () => window.matchMedia('(prefers-color-scheme: light)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const sync = () => setSystemPrefersLight(mq.matches);
+    sync();
+    if (settings.theme !== 'system') return;
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, [settings.theme]);
+
+  const resolvedTheme =
+    settings.theme === 'system' ? (systemPrefersLight ? 'light' : 'dark') : settings.theme;
+  const nextTheme = resolvedTheme === 'light' ? 'dark' : 'light';
+
+  const handleInstall = async () => {
+    const outcome = await promptInstall();
+    if (outcome === 'unavailable') {
+      toast('On iOS: Share → Add to Home Screen. On Android: browser menu → Install app.');
+    }
+  };
 
   const thisWeek = sessionsThisWeek(sessions, settings.weekStartsOn);
   const streak = weeklyStreak(sessions, settings.weeklyTarget, settings.weekStartsOn);
@@ -48,7 +76,33 @@ export function Today() {
 
   return (
     <div>
-      <PageHeader title="Today" subtitle={formatDay(todayLocal())} />
+      <PageHeader
+        title="Today"
+        subtitle={formatDay(todayLocal())}
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label={`Switch to ${nextTheme} theme`}
+              title={`Switch to ${nextTheme} theme`}
+              onClick={() => updateSettings({ theme: nextTheme })}
+            >
+              {resolvedTheme === 'light' ? (
+                <Moon size={15} strokeWidth={1.5} />
+              ) : (
+                <Sun size={15} strokeWidth={1.5} />
+              )}
+            </Button>
+            {!installed && (
+              <Button variant="secondary" size="sm" onClick={handleInstall}>
+                <Smartphone size={14} strokeWidth={1.5} />
+                Install app
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {inProgress && (
         <Card className="mb-4 flex flex-wrap items-center justify-between gap-3 border-border-strong">
