@@ -150,13 +150,15 @@ export default function Settings() {
           />
           <Row
             label="Default rest"
-            hint="Used when a block has no rest of its own."
+            hint="Used when a block has no rest of its own. Steps by 10; tap the number to type."
             control={
               <div className="flex items-center gap-2">
                 <Stepper
                   value={settings.restTimerDefaultSec}
                   min={15}
                   max={300}
+                  step={10}
+                  editable
                   ariaLabel="Default rest seconds"
                   onChange={(restTimerDefaultSec) => updateSettings({ restTimerDefaultSec })}
                 />
