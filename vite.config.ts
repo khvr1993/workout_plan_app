@@ -1,9 +1,15 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-const buildStamp = new Date().toISOString().slice(0, 10);
+const packageVersion = (
+  JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
+const buildStamp = `${packageVersion} · ${new Date().toISOString().slice(0, 10)}`;
 
 export default defineConfig({
   // Relative URLs keep one build valid at a domain root (Vercel) and under a
