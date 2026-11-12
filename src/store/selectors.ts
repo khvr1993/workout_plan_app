@@ -8,7 +8,11 @@ export function useNextDay() {
 }
 
 export function useInProgressSession() {
-  return useAppStore((s) => s.sessions.find((x) => x.status === 'in-progress') ?? null);
+  // A strength draft without a day cannot be resumed; do not send the user to
+  // /session/undefined because of a malformed legacy record.
+  return useAppStore(
+    (s) => s.sessions.find((x) => x.status === 'in-progress' && Boolean(x.dayId)) ?? null,
+  );
 }
 
 export function useUnit() {

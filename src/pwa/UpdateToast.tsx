@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { RefreshCw } from 'lucide-react';
-import { applyUpdate } from './registerSW';
+import { applyUpdate, hasPendingUpdate } from './registerSW';
 
 export function UpdateToast() {
-  const [available, setAvailable] = useState(false);
+  // An update may be discovered before this listener mounts; start from the
+  // queued state instead of dropping the event.
+  const [available, setAvailable] = useState(hasPendingUpdate);
 
   useEffect(() => {
     const onUpdate = () => setAvailable(true);
     window.addEventListener('sw-update-available', onUpdate);
+    if (hasPendingUpdate()) setAvailable(true);
     return () => window.removeEventListener('sw-update-available', onUpdate);
   }, []);
 

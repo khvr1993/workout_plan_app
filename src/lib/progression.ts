@@ -1,19 +1,37 @@
 import type { Exercise, ProgressionState, SetEntry } from '../data/types';
 import { daysBetween, todayLocal } from './date';
 
+export const MIN_REST_SECONDS = 15;
+
+function toTempoSeconds(tempo: string | undefined): 2 | 3 | 4 {
+  const parsed = tempo ? parseInt(tempo.split('-')[0], 10) : NaN;
+  // Only 2/3/4 are valid for the schema; anything else must not poison stored data.
+  return parsed === 3 || parsed === 4 ? parsed : 2;
+}
+
 export function initialProgression(exercise: Exercise, restSeconds: number): ProgressionState {
-  const tempoSeconds = exercise.tempo ? (parseInt(exercise.tempo.split('-')[0], 10) as 2 | 3 | 4) : 2;
   return {
     exerciseId: exercise.id,
     currentWeight: exercise.loadOptions[0] ?? 0,
     targetReps: exercise.reps.min,
     stage: 'reps',
-    tempoSeconds: Number.isFinite(tempoSeconds) ? tempoSeconds : 2,
+    tempoSeconds: toTempoSeconds(exercise.tempo),
     paused: false,
     restSeconds,
     weeksAtStage: 0,
     updatedAt: todayLocal(),
   };
+}
+
+/**
+ * Rest actually used by the timer: the block's rest tightened by any applied
+ * rest-compression progression, never below a floor or above the block value.
+ */
+export function effectiveRestSeconds(baseSeconds: number, leverSeconds: number[]): number {
+  const base = baseSeconds > 0 ? baseSeconds : 60;
+  const tightened = leverSeconds.filter((n) => Number.isFinite(n) && n > 0);
+  const target = tightened.length > 0 ? Math.min(...tightened) : base;
+  return Math.max(MIN_REST_SECONDS, Math.min(base, target));
 }
 
 export type SuggestionKind = 'reps' | 'weight' | 'tempo' | 'pause' | 'rest' | 'maintain';

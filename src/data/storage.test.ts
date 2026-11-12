@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { LocalStorageAdapter, wrap, unwrap, STORAGE_KEYS } from './storage';
+import { LocalStorageAdapter, wrap, STORAGE_KEYS } from './storage';
 import { loadKey } from './migrations';
 import { metaSchema, programSchema, sessionSchema, settingsSchema } from './schema';
 import { defaultSettings } from './defaults';
@@ -10,18 +10,23 @@ import { defaultMeta } from './defaults';
 import type { AppData } from './types';
 
 describe('storage adapter', () => {
-  it('round-trips values and notifies subscribers', () => {
+  it('round-trips values and notifies subscribers of other-tab writes only', () => {
     const adapter = new LocalStorageAdapter();
-    let seen: unknown = null;
-    const unsub = adapter.subscribe('wt:test', (v) => {
-      seen = v;
-    });
+    const seen: unknown[] = [];
+    const unsub = adapter.subscribe('wt:test', (v) => seen.push(v));
     adapter.set('wt:test', { a: 1 });
     expect(adapter.get('wt:test')).toEqual({ a: 1 });
-    expect(seen).toEqual({ a: 1 });
+    // A local write must not echo back into the store that made it.
+    expect(seen).toHaveLength(0);
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: 'wt:test', newValue: JSON.stringify({ a: 2 }) }),
+    );
+    expect(seen).toEqual([{ a: 2 }]);
     unsub();
-    adapter.set('wt:test', { a: 2 });
-    expect(seen).toEqual({ a: 1 });
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: 'wt:test', newValue: JSON.stringify({ a: 3 }) }),
+    );
+    expect(seen).toHaveLength(1);
   });
 
   it('returns null for corrupt JSON instead of throwing', () => {
@@ -39,11 +44,10 @@ describe('storage adapter', () => {
 });
 
 describe('envelope + migrations', () => {
-  it('wraps and unwraps current version', () => {
-    const env = wrap(defaultSettings);
-    const { value, unknownVersion } = unwrap<typeof defaultSettings>(env);
-    expect(unknownVersion).toBe(false);
-    expect(value).toEqual(defaultSettings);
+  it('loads a current-version envelope', () => {
+    const res = loadKey(wrap(defaultSettings), settingsSchema);
+    expect(res.readOnly).toBe(false);
+    expect(res.value).toEqual(defaultSettings);
   });
 
   it('flags newer versions as read-only', () => {

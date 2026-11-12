@@ -2,7 +2,8 @@ import { useRef, useState } from 'react';
 import { Upload, Trash2, Smartphone, Github, Check, ExternalLink } from 'lucide-react';
 import { useAppStore, storage } from '../store/useAppStore';
 import type { AppData, Settings as SettingsType } from '../data/types';
-import { parseImport } from '../lib/export';
+import { MAX_IMPORT_BYTES, parseImport } from '../lib/export';
+import { BUILD_VERSION } from '../lib/version';
 import { BackupExportButton } from '../components/layout/BackupReminder';
 import { AutoBackupSettings } from '../components/layout/AutoBackupSettings';
 import { PageHeader, Section } from '../components/layout/AppShell';
@@ -63,6 +64,10 @@ export default function Settings() {
     usage > 1024 * 1024 ? `${(usage / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(usage / 1024))} KB`;
 
   const handleFile = async (file: File) => {
+    if (file.size > MAX_IMPORT_BYTES) {
+      toast('File is too large to import (5 MB max).', 'error');
+      return;
+    }
     const text = await file.text();
     const result = parseImport(text);
     if (!result.ok) {
@@ -335,7 +340,11 @@ export default function Settings() {
               </Button>
             }
           />
-          <Row label="Version" control={<span className="text-sm text-text-secondary tnum">1.0.0</span>} />
+          <Row
+            label="Version"
+            hint="Build stamp"
+            control={<span className="text-sm text-text-secondary tnum">{BUILD_VERSION}</span>}
+          />
           <Row
             label="Source"
             control={
@@ -373,8 +382,13 @@ export default function Settings() {
         onClose={() => setPendingImport(null)}
         onConfirm={() => {
           if (pendingImport) {
-            importAll(pendingImport);
-            toast('Data imported', 'success');
+            const saved = importAll(pendingImport);
+            toast(
+              saved
+                ? 'Data imported'
+                : useAppStore.getState().storageError ?? 'Could not save the imported data.',
+              saved ? 'success' : 'error',
+            );
           }
         }}
         title="Import and replace?"

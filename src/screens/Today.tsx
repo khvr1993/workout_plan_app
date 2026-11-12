@@ -27,6 +27,8 @@ const WEEKDAY_HINT: Record<number, string> = {
   5: 'day-c',
 };
 
+const THEME_ORDER = ['system', 'light', 'dark'] as const;
+
 export function Today() {
   const navigate = useNavigate();
   const sessions = useAppStore((s) => s.sessions);
@@ -52,7 +54,8 @@ export function Today() {
 
   const resolvedTheme =
     settings.theme === 'system' ? (systemPrefersLight ? 'light' : 'dark') : settings.theme;
-  const nextTheme = resolvedTheme === 'light' ? 'dark' : 'light';
+  // Cycle through all three modes so the header button can return to system.
+  const nextTheme = THEME_ORDER[(THEME_ORDER.indexOf(settings.theme) + 1) % THEME_ORDER.length];
 
   const handleInstall = async () => {
     const outcome = await promptInstall();
@@ -84,8 +87,9 @@ export function Today() {
             <Button
               variant="secondary"
               size="sm"
+              disabled={safeMode}
               aria-label={`Switch to ${nextTheme} theme`}
-              title={`Switch to ${nextTheme} theme`}
+              title={`Theme: ${settings.theme}. Next: ${nextTheme}.`}
               onClick={() => updateSettings({ theme: nextTheme })}
             >
               {resolvedTheme === 'light' ? (

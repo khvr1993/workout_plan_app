@@ -1,18 +1,15 @@
-import type { Exercise, Session, Unit } from '../../data/types';
-import { lastPerformance } from '../../lib/stats';
+import type { Unit } from '../../data/types';
+import type { ExercisePerformance } from '../../lib/stats';
 import { formatShort } from '../../lib/date';
 import { formatWeight } from '../../lib/units';
 
 export function LastPerformanceLine({
-  sessions,
-  exercise,
+  last,
   unit,
 }: {
-  sessions: Session[];
-  exercise: Exercise;
+  last: ExercisePerformance | null;
   unit: Unit;
 }) {
-  const last = lastPerformance(sessions, exercise.id);
   if (!last || last.topWeight == null) return null;
   const reps = last.sets.map((s) => s.reps ?? 0);
   const allSame = reps.length > 0 && reps.every((r) => r === reps[0]);

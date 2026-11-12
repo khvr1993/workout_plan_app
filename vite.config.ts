@@ -3,10 +3,16 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const buildStamp = new Date().toISOString().slice(0, 10);
+
 export default defineConfig({
   // Relative URLs keep one build valid at a domain root (Vercel) and under a
   // repository subpath (GitHub Pages); HashRouter keeps the document URL fixed.
   base: './',
+  define: {
+    // Visible in Settings so a user can tell which build they are running.
+    __BUILD_VERSION__: JSON.stringify(buildStamp),
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -38,5 +44,16 @@ export default defineConfig({
   ],
   build: {
     target: 'es2022',
+    rollupOptions: {
+      output: {
+        // Keep the entry chunk small enough to stay under Vite's warning size.
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          motion: ['motion'],
+          zod: ['zod'],
+          dates: ['date-fns'],
+        },
+      },
+    },
   },
 });

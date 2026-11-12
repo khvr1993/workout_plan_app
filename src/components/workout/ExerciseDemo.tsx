@@ -48,6 +48,9 @@ export function ExerciseDemo({ exerciseId, name, className }: ExerciseDemoProps)
         <img
           src={start}
           alt={`${name} — start position`}
+          loading="lazy"
+          decoding="async"
+          draggable={false}
           className={cn(
             'absolute inset-0 h-full w-full object-cover transition-opacity duration-500',
             phase === 0 ? 'opacity-100' : 'opacity-0',
@@ -56,6 +59,9 @@ export function ExerciseDemo({ exerciseId, name, className }: ExerciseDemoProps)
         <img
           src={end}
           alt={`${name} — end position`}
+          loading="lazy"
+          decoding="async"
+          draggable={false}
           className={cn(
             'absolute inset-0 h-full w-full object-cover transition-opacity duration-500',
             phase === 1 ? 'opacity-100' : 'opacity-0',

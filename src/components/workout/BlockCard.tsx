@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Info } from 'lucide-react';
 import type { Block, BlockLog, Exercise, ProgressionState, Session, SetEntry, Unit } from '../../data/types';
 import { Card } from '../ui/Card';
@@ -10,12 +10,16 @@ import { LastPerformanceLine } from './LastPerformanceLine';
 import { TempoCue } from './TempoCue';
 import { ProgressionBanner } from './ProgressionBanner';
 import { ExerciseInfoContent, repRangeLabel } from './ExerciseInfo';
-import { lastPerformance } from '../../lib/stats';
+import { lastPerformance, type ExercisePerformance } from '../../lib/stats';
 import { cn } from '../../lib/cn';
 
 export interface BlockCardProps {
   block: Block;
   blockLog: BlockLog;
+  /** The session being logged — never treated as "last time". */
+  sessionId: string;
+  /** Effective rest after any rest-compression progression. */
+  restSeconds: number;
   sessions: Session[];
   progression: Record<string, ProgressionState>;
   unit: Unit;
@@ -27,6 +31,8 @@ export interface BlockCardProps {
 export function BlockCard({
   block,
   blockLog,
+  sessionId,
+  restSeconds,
   sessions,
   progression,
   unit,
@@ -36,19 +42,27 @@ export function BlockCard({
 }: BlockCardProps) {
   const [infoEx, setInfoEx] = useState<Exercise | null>(null);
 
+  const lastByExercise = useMemo(() => {
+    const map: Record<string, ExercisePerformance | null> = {};
+    for (const ex of block.exercises) {
+      map[ex.id] = lastPerformance(sessions, ex.id, sessionId);
+    }
+    return map;
+  }, [block.exercises, sessions, sessionId]);
+
   return (
     <Card>
       <div className="flex items-center gap-2 flex-wrap mb-1">
         <h2 className="text-h3 text-text">{block.label}</h2>
         {block.superset && <Pill tone="accent">Superset</Pill>}
-        <Pill>Rest {blockLog.restSeconds}s</Pill>
+        <Pill>Rest {restSeconds}s</Pill>
       </div>
 
       {block.exercises.map((ex, exIndex) => {
         const exLog = blockLog.exercises.find((e) => e.exerciseId === ex.id);
         if (!exLog) return null;
         const prog = progression[ex.id];
-        const last = lastPerformance(sessions, ex.id);
+        const last = lastByExercise[ex.id] ?? null;
         const slotLabel = block.superset
           ? `${block.label.replace('Block ', '')}${exIndex === 0 ? 'A' : 'B'}`
           : null;
@@ -65,7 +79,7 @@ export function BlockCard({
                   <span className="text-body-sm text-text-muted tnum">{repRangeLabel(ex)}</span>
                 </div>
                 <div className="mt-1 flex flex-col gap-1">
-                  <LastPerformanceLine sessions={sessions} exercise={ex} unit={unit} />
+                  <LastPerformanceLine last={last} unit={unit} />
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <TempoCue exercise={ex} prog={prog} metronomeEnabled={metronome} />
                     {prog?.paused && <Pill>1s pause</Pill>}

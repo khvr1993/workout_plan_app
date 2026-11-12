@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ENVELOPE_VERSION, unwrap, type Envelope } from './storage';
+import { ENVELOPE_VERSION, type Envelope } from './storage';
 import { LOAD_OPTIONS } from './program';
 
 // Migration chain: index = source version, value = transform to version + 1.
@@ -81,32 +81,104 @@ function normalizeLoadOptions(value: unknown): unknown {
 
 const migrations: Array<(value: unknown) => unknown> = [renameDays, normalizeLoadOptions];
 
+export type ReadFailure = 'newer' | 'invalid' | 'corrupt';
+
 export interface LoadResult<T> {
   value: T | null;
   /** Data exists but cannot be read safely (newer version or corrupt). */
   readOnly: boolean;
+  reason?: ReadFailure;
+  /** The value was repaired from an older, looser schema. */
+  repaired?: boolean;
 }
 
-export function loadKey<T>(raw: unknown, schema: z.ZodType<T>): LoadResult<T> {
+export interface DecodedValue {
+  value: unknown | null;
+  readOnly: boolean;
+  reason?: ReadFailure;
+}
+
+/** Applies the envelope/migration chain without validating against a schema. */
+function decodeValue(raw: unknown): DecodedValue {
   if (raw == null) return { value: null, readOnly: false };
 
   let current: unknown = raw;
   if (typeof raw === 'object' && raw !== null && 'v' in raw && 'value' in raw) {
     const env = raw as Envelope<unknown>;
-    if (env.v > ENVELOPE_VERSION) return { value: null, readOnly: true };
+    if (env.v > ENVELOPE_VERSION) return { value: null, readOnly: true, reason: 'newer' };
     let v = env.v;
     current = env.value;
     while (v < ENVELOPE_VERSION) {
       const migrate = migrations[v - 1];
-      if (!migrate) return { value: null, readOnly: true };
+      if (!migrate) return { value: null, readOnly: true, reason: 'newer' };
       current = migrate(current);
       v++;
     }
   }
+  return { value: current, readOnly: false };
+}
 
-  const parsed = schema.safeParse(current);
-  if (!parsed.success) return { value: null, readOnly: true };
+export function loadKey<T>(raw: unknown, schema: z.ZodType<T>): LoadResult<T> {
+  if (raw == null) return { value: null, readOnly: false };
+  const decoded = decodeValue(raw);
+  if (decoded.readOnly) return { value: null, readOnly: true, reason: decoded.reason };
+
+  const parsed = schema.safeParse(decoded.value);
+  if (!parsed.success) return { value: null, readOnly: true, reason: 'invalid' };
   return { value: parsed.data, readOnly: false };
 }
 
-export { unwrap };
+function decodeRawText(rawText: string | null): DecodedValue {
+  if (rawText == null) return { value: null, readOnly: false };
+  let raw: unknown;
+  try {
+    raw = JSON.parse(rawText);
+  } catch {
+    return { value: null, readOnly: true, reason: 'corrupt' };
+  }
+  return decodeValue(raw);
+}
+
+/**
+ * Reads a key from its raw text so unparseable JSON is reported as corrupt
+ * instead of looking like an empty key (which the next write would overwrite).
+ */
+export function loadKeyRaw<T>(rawText: string | null, schema: z.ZodType<T>): LoadResult<T> {
+  if (rawText == null) return { value: null, readOnly: false };
+  const decoded = decodeRawText(rawText);
+  if (decoded.readOnly) return { value: null, readOnly: true, reason: decoded.reason };
+
+  const parsed = schema.safeParse(decoded.value);
+  if (!parsed.success) return { value: null, readOnly: true, reason: 'invalid' };
+  return { value: parsed.data, readOnly: false };
+}
+
+/**
+ * Like loadKeyRaw, but gives an older value one chance to be repaired before
+ * the key is declared unreadable. Corrupt JSON and newer-version envelopes are
+ * never guessed at.
+ */
+export function loadKeyRawWithRepair<T>(
+  rawText: string | null,
+  schema: z.ZodType<T>,
+  repair: (value: unknown) => unknown | null,
+): LoadResult<T> {
+  if (rawText == null) return { value: null, readOnly: false };
+  const decoded = decodeRawText(rawText);
+  if (decoded.readOnly) return { value: null, readOnly: true, reason: decoded.reason };
+
+  const parsed = schema.safeParse(decoded.value);
+  if (parsed.success) return { value: parsed.data, readOnly: false };
+
+  let repaired: unknown | null = null;
+  try {
+    repaired = repair(decoded.value);
+  } catch {
+    repaired = null;
+  }
+  if (repaired == null) return { value: null, readOnly: true, reason: 'invalid' };
+
+  const retry = schema.safeParse(repaired);
+  if (!retry.success) return { value: null, readOnly: true, reason: 'invalid' };
+  return { value: retry.data, readOnly: false, repaired: true };
+}

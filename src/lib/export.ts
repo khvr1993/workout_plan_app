@@ -1,5 +1,5 @@
 import type { AppData } from '../data/types';
-import { appDataSchema } from '../data/schema';
+import { appDataSchema, LIMITS } from '../data/schema';
 
 export interface ExportFile {
   app: 'workout-tracker';
@@ -8,6 +8,18 @@ export interface ExportFile {
   data: AppData;
 }
 
+/** Recovery export: a normal importable file plus the untouched stored text. */
+export interface RecoveryExportFile extends ExportFile {
+  raw: Record<string, string | null>;
+}
+
+/**
+ * Hard ceiling on what the import screen will read. Anything larger is
+ * rejected before it is parsed, so a hostile file cannot exhaust memory by
+ * sheer size or by inflating validation errors.
+ */
+export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+
 export function buildExport(data: AppData): ExportFile {
   return {
     app: 'workout-tracker',
@@ -15,6 +27,13 @@ export function buildExport(data: AppData): ExportFile {
     exportedAt: new Date().toISOString(),
     data,
   };
+}
+
+export function buildRecoveryExport(
+  data: AppData,
+  raw: Record<string, string | null>,
+): RecoveryExportFile {
+  return { ...buildExport(data), raw };
 }
 
 export function downloadJson(filename: string, payload: unknown) {
@@ -38,6 +57,10 @@ export type ImportResult =
   | { ok: false; error: string };
 
 export function parseImport(text: string): ImportResult {
+  if (text.length > MAX_IMPORT_BYTES) {
+    return { ok: false, error: 'File is too large to import (5 MB max).' };
+  }
+
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -54,7 +77,30 @@ export function parseImport(text: string): ImportResult {
   if (file.version !== 1) {
     return { ok: false, error: `Unsupported export version ${String(file.version)}.` };
   }
-  const parsed = appDataSchema.safeParse(file.data);
+
+  // Check collection sizes before handing the data to zod: schema item limits
+  // are evaluated per element, so an oversized array still costs time/memory.
+  const data = (raw as { data: unknown }).data;
+  if (data && typeof data === 'object') {
+    const sessions = (data as { sessions?: unknown }).sessions;
+    if (Array.isArray(sessions) && sessions.length > LIMITS.sessions) {
+      return { ok: false, error: `Too many sessions (${sessions.length}); the limit is ${LIMITS.sessions}.` };
+    }
+    const progression = (data as { progression?: unknown }).progression;
+    if (progression && typeof progression === 'object' && !Array.isArray(progression)) {
+      const count = Object.keys(progression).length;
+      if (count > LIMITS.progressionEntries) {
+        return { ok: false, error: `Too many progression entries (${count}); the limit is ${LIMITS.progressionEntries}.` };
+      }
+    }
+    const program = (data as { program?: unknown }).program;
+    const days = program && typeof program === 'object' ? (program as { days?: unknown }).days : null;
+    if (Array.isArray(days) && days.length > LIMITS.days) {
+      return { ok: false, error: `Too many program days (${days.length}); the limit is ${LIMITS.days}.` };
+    }
+  }
+
+  const parsed = appDataSchema.safeParse((raw as { data: unknown }).data);
   if (!parsed.success) {
     const first = parsed.error.issues[0];
     return {

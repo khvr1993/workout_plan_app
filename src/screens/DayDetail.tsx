@@ -40,6 +40,9 @@ export function DayDetail() {
   const resetProgram = useAppStore((s) => s.resetProgram);
   const unit = useAppStore((s) => s.settings.unit);
   const safeMode = useAppStore((s) => s.safeMode);
+  const inProgress = useAppStore(
+    (s) => s.sessions.find((x) => x.status === 'in-progress' && Boolean(x.dayId)) ?? null,
+  );
 
   const [editing, setEditing] = useState(false);
   const [infoEx, setInfoEx] = useState<Exercise | null>(null);
@@ -72,6 +75,9 @@ export function DayDetail() {
   }
 
   const exerciseCount = day.blocks.reduce((n, b) => n + b.exercises.length, 0);
+  // Only one workout may be in progress; send the user back to it instead of
+  // silently starting a second one.
+  const resumeDayId = inProgress && inProgress.dayId && inProgress.dayId !== day.id ? inProgress.dayId : null;
 
   const patchBlock = (blockId: string, patch: Partial<Block>) => {
     updateDay({
@@ -180,9 +186,9 @@ export function DayDetail() {
               variant="primary"
               size="sm"
               disabled={safeMode}
-              onClick={() => navigate(`/session/${day.id}`)}
+              onClick={() => navigate(`/session/${resumeDayId ?? day.id}`)}
             >
-              Start
+              {resumeDayId ? 'Resume workout' : 'Start'}
             </Button>
           </>
         }

@@ -34,15 +34,18 @@ function renderToday() {
 }
 
 describe('Today header actions', () => {
-  it('switches to light theme and back from the header toggle', async () => {
+  it('cycles dark → system → light → dark from the header toggle', async () => {
     const user = userEvent.setup();
     renderToday();
 
-    await user.click(screen.getByRole('button', { name: 'Switch to light theme' }));
-    expect(useAppStore.getState().settings.theme).toBe('light');
-    expect(await screen.findByRole('button', { name: 'Switch to dark theme' })).toBeInTheDocument();
+    // Cycling means the header can always get back to following the device.
+    await user.click(screen.getByRole('button', { name: 'Switch to system theme' }));
+    expect(useAppStore.getState().settings.theme).toBe('system');
 
-    await user.click(screen.getByRole('button', { name: 'Switch to dark theme' }));
+    await user.click(await screen.findByRole('button', { name: 'Switch to light theme' }));
+    expect(useAppStore.getState().settings.theme).toBe('light');
+
+    await user.click(await screen.findByRole('button', { name: 'Switch to dark theme' }));
     expect(useAppStore.getState().settings.theme).toBe('dark');
   });
 

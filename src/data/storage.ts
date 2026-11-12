@@ -1,7 +1,10 @@
 export interface StoragePort {
   get<T>(key: string): T | null;
+  /** Unparsed text, so a corrupt value can be told apart from a missing one. */
+  readRaw?(key: string): string | null;
   set<T>(key: string, value: T): void;
   remove(key: string): void;
+  /** Fires for changes made by *other* tabs only. */
   subscribe(key: string, fn: (value: unknown) => void): () => void;
   usageBytes(): number;
 }
@@ -50,9 +53,18 @@ export class LocalStorageAdapter implements StoragePort {
     }
   }
 
+  readRaw(key: string): string | null {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
   set<T>(key: string, value: T): void {
+    // Deliberately does not notify local listeners: those represent other tabs.
+    // Echoing our own writes would make cross-tab syncing re-enter the store.
     localStorage.setItem(key, JSON.stringify(value));
-    this.listeners.get(key)?.forEach((fn) => fn(value));
   }
 
   remove(key: string): void {
@@ -80,16 +92,4 @@ export class LocalStorageAdapter implements StoragePort {
 
 export function wrap<T>(value: T): Envelope<T> {
   return { v: ENVELOPE_VERSION, value };
-}
-
-export function unwrap<T>(raw: unknown): { value: T | null; unknownVersion: boolean } {
-  if (raw == null) return { value: null, unknownVersion: false };
-  if (typeof raw === 'object' && raw !== null && 'v' in raw && 'value' in raw) {
-    const env = raw as Envelope<T>;
-    if (env.v === ENVELOPE_VERSION) return { value: env.value, unknownVersion: false };
-    if (env.v > ENVELOPE_VERSION) return { value: null, unknownVersion: true };
-    return { value: env.value, unknownVersion: false }; // older: caller migrates
-  }
-  // Pre-envelope raw value (legacy)
-  return { value: raw as T, unknownVersion: false };
 }

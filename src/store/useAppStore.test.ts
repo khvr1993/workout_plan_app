@@ -13,6 +13,8 @@ function resetStore() {
     meta: defaultMeta(),
     progression: {},
     safeMode: false,
+    storageIssue: null,
+    storageNotice: null,
     storageError: null,
     restEndsAt: null,
     restTotalSec: 0,

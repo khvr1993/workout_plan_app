@@ -3,24 +3,16 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { MobileHeader } from './MobileHeader';
-import { useAppStore } from '../../store/useAppStore';
-import { SafeModeBanner } from './SafeModeBanner';
+import { StorageBanners } from './SafeModeBanner';
 import { BackupReminder } from './BackupReminder';
 
 export function AppShell() {
-  const safeMode = useAppStore((s) => s.safeMode);
-  const storageError = useAppStore((s) => s.storageError);
   return (
     <div className="min-h-dvh bg-bg">
       <Sidebar />
       <MobileHeader />
       <div className="lg:pl-62">
-        {safeMode && <SafeModeBanner />}
-        {storageError && (
-          <div role="alert" className="border-b border-border bg-surface px-5 py-2 text-[13px] text-danger">
-            {storageError}
-          </div>
-        )}
+        <StorageBanners />
         <main className="mx-auto w-full max-w-270 px-5 lg:px-12 pt-6 lg:pt-10 pb-24 lg:pb-16">
           <BackupReminder />
           <Outlet />

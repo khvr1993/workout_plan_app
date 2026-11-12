@@ -15,6 +15,8 @@ function resetStore() {
     meta: defaultMeta(),
     progression: {},
     safeMode: false,
+    storageIssue: null,
+    storageNotice: null,
     storageError: null,
     restEndsAt: null,
     restTotalSec: 0,
@@ -96,6 +98,19 @@ describe('full session flow', () => {
     expect(
       screen.getByRole('button', { name: 'Complete Bulgarian Split Squat round 2' }),
     ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('settles on the first draft when two in-progress workouts already exist', async () => {
+    useAppStore.getState().startSession('day-a');
+    useAppStore.getState().startSession('day-b');
+    window.location.hash = '#/session/day-b';
+    render(<App />);
+
+    // The second draft must redirect to the first, not ping-pong forever.
+    expect(await screen.findByText('Bulgarian Split Squat')).toBeInTheDocument();
+    expect(
+      useAppStore.getState().sessions.filter((s) => s.status === 'in-progress'),
+    ).toHaveLength(2);
   });
 
   it('discarding a workout keeps it as abandoned and does not advance rotation', async () => {

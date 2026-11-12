@@ -77,12 +77,19 @@ export function normalizeSet(set: SetEntry, unit: Session['unit']) {
   };
 }
 
-export function lastPerformance(sessions: Session[], exerciseId: string): ExercisePerformance | null {
+export function lastPerformance(
+  sessions: Session[],
+  exerciseId: string,
+  excludeSessionId?: string,
+): ExercisePerformance | null {
   const sorted = [...sessions].sort(
     (a, b) => b.date.localeCompare(a.date) || b.startedAt.localeCompare(a.startedAt),
   );
   for (const s of sorted) {
-    if (s.status === 'abandoned') continue;
+    // Only finished workouts count as history: an in-progress or abandoned
+    // draft must never become its own "last time".
+    if (s.status !== 'completed') continue;
+    if (s.id === excludeSessionId) continue;
     const sets = sessionSetsKg(s, exerciseId);
     if (!sets) continue;
     const done = sets.filter((x) => x.completed && !x.skipped);
@@ -136,6 +143,7 @@ export interface PersonalBest {
   weight: number;
   reps: number;
   date: string;
+  sessionId: string;
   e1rm: number;
 }
 
@@ -146,15 +154,16 @@ export function personalBest(sessions: Session[], exerciseId: string): PersonalB
     if (!perf.bestSet) continue;
     const score = e1rm(perf.bestSet.weight, perf.bestSet.reps);
     if (!best || score > best.e1rm) {
-      best = { ...perf.bestSet, date: perf.date, e1rm: score };
+      best = { ...perf.bestSet, date: perf.date, sessionId: perf.sessionId, e1rm: score };
     }
   }
   return best;
 }
 
 export function isPrSession(sessions: Session[], exerciseId: string, sessionId: string): boolean {
-  const best = personalBest(sessions, exerciseId);
-  return best != null && best.date === sessions.find((s) => s.id === sessionId)?.date;
+  // Compare the session, not the date: two workouts on one day must not both
+  // claim the same personal best.
+  return personalBest(sessions, exerciseId)?.sessionId === sessionId;
 }
 
 export function averageDuration(sessions: Session[]): number | null {

@@ -52,7 +52,7 @@ npm run dev        # dev server (served under /workout_plan_app/)
 
 Pushing to `main` triggers `.github/workflows/deploy.yml`: tests → build → deploy. One-time repo setup: **Settings → Pages → Source: GitHub Actions**.
 
-The build uses a relative `base: './'`, so the same `dist` works at a domain root (Vercel, custom domains) and under a repository subpath (project Pages) with no config change. A `HashRouter` keeps the document URL fixed, so asset and service-worker URLs stay valid and deep links never 404.
+The build uses a relative `base: './'`, so the same `dist` works at a domain root (Vercel, custom domains) and under a repository subpath (project Pages) with no config change. A `HashRouter` keeps the document URL fixed, so asset and service-worker URLs stay valid and deep links never 404. Pages serves static files only — the security headers in `vercel.json` do not apply there (see *Security & privacy*).
 
 ## Deployment (Vercel)
 
@@ -73,6 +73,17 @@ Import the repository with framework **Vite** (or use the committed `vercel.json
 - **Automatic backup** (desktop Chrome/Edge): pick one file once in Settings → Data and the app overwrites it daily while open, and shortly after your data changes. The file handle lives in IndexedDB; if write permission expires, the app pauses and offers a one-tap reconnect. Other browsers keep the manual export.
 - A reminder card appears at most every 3 days until a backup exists (or automatic backup is on); “Remind me in 3 days” snoozes it.
 - In-progress sessions survive refresh, backgrounding and app kills; rest timers are stored as end-timestamps so they stay accurate while the app is backgrounded.
+
+## Security & privacy
+
+Single-user and offline-first: no accounts, no server, no analytics, no runtime network requests. That removes most of the usual web attack surface; the remaining untrusted input is an imported backup file.
+
+- **Imports are bounded.** Files over 5 MB are rejected before they are read, collection and text lengths have hard caps in the schema, and dates must be real calendar days — not merely `YYYY-MM-DD`. A crafted file can neither exhaust memory nor store a value that later crashes a screen.
+- **Stored data is validated on load.** An unreadable key opens the app read-only instead of being overwritten; the banner names the damaged key, and the recovery export keeps the original stored text next to a normal, re-importable backup.
+- **No XSS surface:** no `innerHTML`, `dangerouslySetInnerHTML`, `eval` or third-party scripts. Fonts and exercise photos are bundled; the only outbound requests are the links you click.
+- **Headers** (Vercel): strict CSP with the inline theme bootstrap allowed by hash only, plus `nosniff`, `no-referrer`, `Permissions-Policy` and `frame-ancestors 'none'`. GitHub Pages cannot set response headers, so that deployment has no CSP or clickjacking protection.
+- **Origin boundary:** on `*.github.io` all project sites share one origin, so another app hosted under the same account can read or overwrite `wt:*` localStorage. Use a dedicated domain (or Vercel) if that matters.
+- **At rest:** the full history (weights, RPE, notes) is unencrypted in `localStorage`, and exports/auto-backups are plaintext JSON — treat a backup file as sensitive, especially in a synced folder.
 
 ## Design
 
@@ -99,4 +110,4 @@ src/
 npm test
 ```
 
-Covers the program seed integrity, rotation/volume/PR math, the progression engine, storage envelopes and migrations, store behaviors (draft recovery, rotation rules, recovery walks), form-guide data and photo assets, the demo player, and full session-logging integration flows — including that a superset starts exactly one rest timer per completed round, only after **both** exercises are done.
+Covers the program seed integrity, rotation/volume/PR math, the progression engine, storage envelopes and migrations, store behaviors (draft recovery, rotation rules, recovery walks), form-guide data and photo assets, the demo player, and full session-logging integration flows — including that a superset starts exactly one rest timer per completed round, only after **both** exercises are done. It also pins the hardening work: calendar-date and import-size limits, corrupt-key detection, read-only guards, a finish that only reports success after a real write, rotation rollback on delete, and the CSP hash staying in sync with the inline script.

@@ -58,10 +58,15 @@ export default function ExerciseProgress() {
       value: Math.round(toDisplay(h.bestSet!.weight, unit) * 10) / 10,
     }));
 
-  const volumeBars = history.map((h) => ({
-    label: formatShort(h.date),
-    value: h.raw.reduce((sum, s) => sum + setVolume(s, sessions.find((x) => x.id === h.sessionId)?.unit ?? unit), 0),
-  }));
+  // Volume is computed in kg; convert before labelling the chart with the
+  // user's display unit so the bars and their axis agree.
+  const volumeBars = history.map((h) => {
+    const kg = h.raw.reduce(
+      (sum, s) => sum + setVolume(s, sessions.find((x) => x.id === h.sessionId)?.unit ?? unit),
+      0,
+    );
+    return { label: formatShort(h.date), value: Math.round(toDisplay(kg, unit) * 10) / 10 };
+  });
 
   const weeksAtStage = prog ? Math.max(0, Math.floor(daysBetween(prog.updatedAt, todayLocal()) / 7)) : 0;
 
@@ -134,7 +139,7 @@ export default function ExerciseProgress() {
           <Card>
             <div className="flex items-center gap-2 flex-wrap mb-3">
               <Pill tone="accent">{stageLabel(prog.stage)}</Pill>
-              <Pill>{weeksAtStage} wk at stage</Pill>
+              <Pill>{weeksAtStage} wk since last change</Pill>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-body-sm tnum">
               <div>

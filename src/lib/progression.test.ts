@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ProgressionState, SetEntry } from '../data/types';
-import { applySuggestion, initialProgression, suggestProgression } from './progression';
+import {
+  applySuggestion,
+  effectiveRestSeconds,
+  initialProgression,
+  suggestProgression,
+} from './progression';
 import { findExercise, program } from '../data/program';
 import { addDaysLocal, todayLocal } from './date';
 
@@ -103,5 +108,21 @@ describe('progression levers', () => {
     const suggestion = suggestProgression(s, ex, sets(10))!;
     applySuggestion(s, suggestion);
     expect(s.targetReps).toBe(10);
+  });
+});
+
+describe('effective rest', () => {
+  it('tightens to an applied rest-compression suggestion', () => {
+    expect(effectiveRestSeconds(90, [45])).toBe(45);
+  });
+
+  it('never raises rest above the block value', () => {
+    expect(effectiveRestSeconds(60, [120])).toBe(60);
+    expect(effectiveRestSeconds(60, [])).toBe(60);
+  });
+
+  it('uses a fallback when the block has no rest and keeps a floor', () => {
+    expect(effectiveRestSeconds(0, [])).toBe(60);
+    expect(effectiveRestSeconds(20, [5])).toBe(15);
   });
 });

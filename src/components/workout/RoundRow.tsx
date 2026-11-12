@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { Check, Pause } from 'lucide-react';
 import type { Exercise, SetEntry, Unit } from '../../data/types';
 import { WeightPicker } from './WeightPicker';
@@ -24,32 +23,9 @@ export function RoundRow({
   onPatch,
   onToggleComplete,
 }: RoundRowProps) {
-  const skipTimer = useRef<number | null>(null);
-  const skipFired = useRef(false);
-
-  const startSkipPress = () => {
-    skipFired.current = false;
-    skipTimer.current = window.setTimeout(() => {
-      skipFired.current = true;
-      onPatch({ skipped: !entry.skipped, completed: false });
-    }, 500);
-  };
-  const cancelSkipPress = () => {
-    if (skipTimer.current != null) {
-      window.clearTimeout(skipTimer.current);
-      skipTimer.current = null;
-    }
-  };
-  const handleCheckClick = () => {
-    if (skipFired.current) {
-      skipFired.current = false;
-      return;
-    }
-    onToggleComplete();
-  };
-
   const repSuffix =
     exercise.reps.unit === 'perLeg' ? ' / leg' : exercise.reps.unit === 'perSide' ? ' / side' : '';
+  const label = `${exercise.name} round ${roundIndex + 1}`;
 
   return (
     <div
@@ -66,7 +42,7 @@ export function RoundRow({
           options={exercise.loadOptions}
           value={entry.weight}
           unit={unit}
-          label={`${exercise.name} round ${roundIndex + 1}`}
+          label={label}
           onChange={(weight) => onPatch({ weight })}
         />
       </div>
@@ -76,7 +52,7 @@ export function RoundRow({
           value={entry.reps}
           min={0}
           max={99}
-          ariaLabel={`Reps${repSuffix} for ${exercise.name} round ${roundIndex + 1}`}
+          ariaLabel={`Reps${repSuffix} for ${label}`}
           onChange={(reps) => onPatch({ reps })}
         />
         <button
@@ -90,7 +66,7 @@ export function RoundRow({
         <button
           type="button"
           aria-pressed={entry.paused ?? false}
-          aria-label={`Paused rep for ${exercise.name} round ${roundIndex + 1}`}
+          aria-label={`Paused rep for ${label}`}
           title="1s pause at the bottom"
           onClick={() => onPatch({ paused: !entry.paused })}
           className={cn(
@@ -112,25 +88,32 @@ export function RoundRow({
             Skipped
           </button>
         ) : (
-          <button
-            type="button"
-            aria-pressed={entry.completed}
-            aria-label={`Complete ${exercise.name} round ${roundIndex + 1}`}
-            title="Complete set (long-press to skip)"
-            onClick={handleCheckClick}
-            onPointerDown={startSkipPress}
-            onPointerUp={cancelSkipPress}
-            onPointerLeave={cancelSkipPress}
-            onContextMenu={(e) => e.preventDefault()}
-            className={cn(
-              'flex h-11 w-11 items-center justify-center rounded-sm border transition-colors duration-150 cursor-pointer select-none',
-              entry.completed
-                ? 'bg-accent border-transparent text-accent-fg'
-                : 'border-border-strong text-text-muted hover:text-text hover:bg-surface-2',
-            )}
-          >
-            <Check size={18} strokeWidth={2} />
-          </button>
+          <>
+            <button
+              type="button"
+              aria-label={`Skip ${label}`}
+              title="Skip this set"
+              onClick={() => onPatch({ skipped: true, completed: false })}
+              className="flex h-11 items-center justify-center rounded-sm px-2 text-[11px] font-medium text-text-muted hover:text-text hover:bg-surface-2 transition-colors cursor-pointer"
+            >
+              Skip
+            </button>
+            <button
+              type="button"
+              aria-pressed={entry.completed}
+              aria-label={`Complete ${label}`}
+              title="Complete set"
+              onClick={onToggleComplete}
+              className={cn(
+                'flex h-11 w-11 items-center justify-center rounded-sm border transition-colors duration-150 cursor-pointer select-none',
+                entry.completed
+                  ? 'bg-accent border-transparent text-accent-fg'
+                  : 'border-border-strong text-text-muted hover:text-text hover:bg-surface-2',
+              )}
+            >
+              <Check size={18} strokeWidth={2} />
+            </button>
+          </>
         )}
       </div>
     </div>

@@ -6,6 +6,7 @@ import { completedRounds, sessionVolume } from '../../lib/volume';
 import { formatDuration } from '../../lib/date';
 import { formatVolume } from '../../lib/units';
 import { cn } from '../../lib/cn';
+import { LIMITS } from '../../data/schema';
 
 export interface SessionSummarySheetProps {
   open: boolean;
@@ -68,6 +69,7 @@ export function SessionSummarySheet({
         <span className="text-label text-text-muted">Notes</span>
         <textarea
           value={notes}
+          maxLength={LIMITS.notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
           placeholder="Felt strong, left shoulder tight…"

@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Footprints } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
 import { useAppStore } from '../store/useAppStore';
 import { PageHeader, Section } from '../components/layout/AppShell';
 import { Card } from '../components/ui/Card';
@@ -11,7 +10,8 @@ import { MonthCalendar } from '../components/history/MonthCalendar';
 import { SessionRow } from '../components/history/SessionRow';
 import { Sheet } from '../components/ui/Sheet';
 import { toast } from '../components/ui/Toast';
-import { todayLocal } from '../lib/date';
+import { formatMonth, isCalendarDate, todayLocal } from '../lib/date';
+import { LIMITS } from '../data/schema';
 
 export default function History() {
   const sessions = useAppStore((s) => s.sessions);
@@ -34,13 +34,16 @@ export default function History() {
   const groups = useMemo(() => {
     const map = new Map<string, typeof visible>();
     for (const s of visible) {
-      const key = format(parseISO(s.date), 'MMMM yyyy');
+      const key = formatMonth(s.date);
       const list = map.get(key) ?? [];
       list.push(s);
       map.set(key, list);
     }
     return [...map.entries()];
   }, [visible]);
+
+  const today = todayLocal();
+  const validWalkDate = isCalendarDate(walkDate) && walkDate <= today;
 
   return (
     <div>
@@ -98,15 +101,24 @@ export default function History() {
           <input
             type="date"
             value={walkDate}
-            max={todayLocal()}
+            max={today}
+            required
+            aria-invalid={!validWalkDate}
+            aria-describedby={!validWalkDate ? 'walk-date-error' : undefined}
             onChange={(e) => setWalkDate(e.target.value)}
             className="mt-2 h-11 w-full rounded-sm border border-border bg-surface-2 px-3 text-sm text-text tnum"
           />
+          {!validWalkDate && (
+            <span id="walk-date-error" className="mt-1 block text-[12px] text-danger">
+              Pick a real date on or before today.
+            </span>
+          )}
         </label>
         <label className="block mb-5">
           <span className="text-label text-text-muted">Notes (optional)</span>
           <input
             value={walkNotes}
+            maxLength={LIMITS.notes}
             onChange={(e) => setWalkNotes(e.target.value)}
             placeholder="Route, pace, how it felt"
             className="mt-2 h-11 w-full rounded-sm border border-border bg-surface-2 px-3 text-sm text-text placeholder:text-text-muted"
@@ -115,9 +127,19 @@ export default function History() {
         <Button
           variant="primary"
           className="w-full"
+          disabled={!validWalkDate}
           onClick={() => {
-            logRecovery(walkDate, walkNotes.trim() || undefined);
+            const session = logRecovery(walkDate, walkNotes.trim() || undefined);
+            if (!session) {
+              toast(
+                useAppStore.getState().storageError ??
+                  'Could not save the walk — storage is read-only.',
+                'error',
+              );
+              return;
+            }
             setWalkOpen(false);
+            setWalkDate(todayLocal());
             setWalkNotes('');
             toast('Recovery walk logged', 'success');
           }}

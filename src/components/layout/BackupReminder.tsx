@@ -3,7 +3,7 @@ import { Download, FolderDown, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useBackupStore } from '../../store/useBackupStore';
 import { buildExport, downloadJson } from '../../lib/export';
-import { daysBetween, todayLocal } from '../../lib/date';
+import { daysBetween, isCalendarDate, todayLocal } from '../../lib/date';
 import { Button } from '../ui/Button';
 import { toast } from '../ui/Toast';
 
@@ -78,8 +78,11 @@ export function BackupReminder() {
   }, []);
 
   if (safeMode || status === 'on') return null;
+  // An unreadable dismissal date must not suppress the reminder.
   const dismissedRecently =
-    dismissedOn != null && daysBetween(dismissedOn, today) < REMIND_AFTER_DAYS;
+    dismissedOn != null &&
+    isCalendarDate(dismissedOn) &&
+    daysBetween(dismissedOn, today) < REMIND_AFTER_DAYS;
   if (dismissedRecently || !backupStale(lastBackupAt, today)) return null;
 
   const title =
