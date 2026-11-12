@@ -16,28 +16,33 @@ export function UpdateToast() {
   }, []);
 
   return (
-    <AnimatePresence>
-      {available && (
-        <motion.div
-          initial={{ opacity: 0, transform: 'translateY(8px)' }}
-          animate={{ opacity: 1, transform: 'translateY(0)' }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.16 }}
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-[80] flex items-center gap-3 rounded-md border border-border bg-surface px-4 py-3"
-          style={{ boxShadow: 'var(--overlay-shadow)' }}
-          role="status"
-        >
-          <RefreshCw size={15} strokeWidth={1.5} className="text-accent" />
-          <span className="text-[13px] text-text">New version available</span>
-          <button
-            type="button"
-            onClick={() => applyUpdate()}
-            className="h-8 rounded-sm bg-accent px-3 text-[13px] font-medium text-accent-fg hover:bg-accent-hover cursor-pointer"
+    <div
+      className="pointer-events-none fixed inset-x-0 top-0 z-[80] flex justify-center px-4"
+      style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+    >
+      <AnimatePresence>
+        {available && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.16 }}
+            className="pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-md border border-border bg-surface px-4 py-3"
+            style={{ boxShadow: 'var(--overlay-shadow)' }}
+            role="status"
           >
-            Reload
-          </button>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            <RefreshCw size={15} strokeWidth={1.5} className="text-accent shrink-0" />
+            <span className="text-[13px] text-text">New version available</span>
+            <button
+              type="button"
+              onClick={() => applyUpdate()}
+              className="h-8 shrink-0 rounded-sm bg-accent px-3 text-[13px] font-medium text-accent-fg hover:bg-accent-hover cursor-pointer"
+            >
+              Reload
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

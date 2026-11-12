@@ -4,6 +4,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { useBackupStore } from '../../store/useBackupStore';
 import { buildExport, downloadJson } from '../../lib/export';
 import { daysBetween, isCalendarDate, todayLocal } from '../../lib/date';
+import { useInstallStore } from '../../pwa/install';
 import { Button } from '../ui/Button';
 import { toast } from '../ui/Toast';
 
@@ -49,6 +50,7 @@ export function BackupReminder() {
   const lastBackupAt = useAppStore((s) => s.meta.lastBackupAt);
   const dismissedOn = useAppStore((s) => s.meta.backupReminderDismissedOn);
   const dismiss = useAppStore((s) => s.dismissBackupReminder);
+  const installed = useInstallStore((s) => s.installed);
   const status = useBackupStore((s) => s.status);
   const fileName = useBackupStore((s) => s.fileName);
   const error = useBackupStore((s) => s.error);
@@ -77,7 +79,8 @@ export function BackupReminder() {
     };
   }, []);
 
-  if (safeMode || status === 'on') return null;
+  if (safeMode) return null;
+  if (installed && status === 'on') return null;
   // An unreadable dismissal date must not suppress the reminder.
   const dismissedRecently =
     dismissedOn != null &&
@@ -86,17 +89,17 @@ export function BackupReminder() {
   if (dismissedRecently || !backupStale(lastBackupAt, today)) return null;
 
   const title =
-    status === 'needs-permission'
+    installed && status === 'needs-permission'
       ? 'Automatic backup is paused'
-      : status === 'error'
+      : installed && status === 'error'
         ? 'Automatic backup needs attention'
         : 'Keep a backup outside this app';
   const body =
-    status === 'needs-permission'
-      ? `Write access to ${fileName ?? 'your backup file'} expired. Reconnect so the app can keep overwriting it daily.`
-      : status === 'error'
+    installed && status === 'needs-permission'
+      ? `Write access to ${fileName ?? 'your backup file'} expired. Reconnect once; if the browser offers "Allow on every visit", choose it so it does not expire again.`
+      : installed && status === 'error'
         ? `${error ?? 'The last automatic backup failed.'} Fix it in Settings → Data, or export a copy now.`
-        : status === 'off'
+        : installed && status === 'off'
           ? 'Turn on automatic backup to overwrite one file daily while the app is open, or save a JSON copy now. Restore anytime in Settings → Import.'
           : 'Save a JSON copy to Files or Downloads. If the app is removed, restore it in Settings → Import.';
 
@@ -105,13 +108,13 @@ export function BackupReminder() {
       <p className="text-sm font-medium text-text">{title}</p>
       <p className="mt-1 text-body-sm text-text-muted">{body}</p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {status === 'off' && (
+        {installed && status === 'off' && (
           <Button variant="primary" size="sm" onClick={() => void enable()} disabled={busy}>
             <FolderDown size={14} strokeWidth={1.5} />
             Enable auto-backup
           </Button>
         )}
-        {status === 'needs-permission' && (
+        {installed && status === 'needs-permission' && (
           <Button variant="primary" size="sm" onClick={() => void reconnect()} disabled={busy}>
             <RefreshCw size={14} strokeWidth={1.5} />
             Reconnect

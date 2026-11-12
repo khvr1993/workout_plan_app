@@ -5,6 +5,7 @@ import { program } from '../data/program';
 import { parseImport } from '../lib/export';
 import { clearBackupHandle, loadBackupHandle, saveBackupHandle, type BackupFileHandle } from '../lib/autoBackup';
 import { useAppStore } from './useAppStore';
+import { useInstallStore } from '../pwa/install';
 import { BACKUP_DEBOUNCE_MS, initAutoBackup, useBackupStore } from './useBackupStore';
 import { useToastStore } from '../components/ui/Toast';
 
@@ -116,6 +117,7 @@ beforeEach(() => {
     throw new DOMException('The user aborted a request.', 'AbortError');
   });
   useBackupStore.setState({ status: 'off', fileName: null, error: null, busy: false });
+  useInstallStore.setState({ installed: true, deferred: null });
 });
 
 afterEach(async () => {
@@ -129,6 +131,20 @@ afterEach(async () => {
 });
 
 describe('initAutoBackup', () => {
+  it('does not initialize outside the installed app', async () => {
+    useInstallStore.setState({ installed: false });
+    const handle = makeFakeHandle();
+    idbState.stored = asHandle(handle);
+    const timersBefore = vi.getTimerCount();
+
+    await startEngine();
+
+    expect(useBackupStore.getState().status).toBe('off');
+    expect(loadBackupHandle).not.toHaveBeenCalled();
+    expect(handle.writes).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(timersBefore);
+  });
+
   it('reports unsupported browsers without scheduling anything', async () => {
     delete (window as PickerWindow).showSaveFilePicker;
     const timersBefore = vi.getTimerCount();

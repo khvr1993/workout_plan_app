@@ -4,6 +4,7 @@ import { defaultMeta, defaultSettings } from '../../data/defaults';
 import { program } from '../../data/program';
 import { useAppStore } from '../../store/useAppStore';
 import { useBackupStore } from '../../store/useBackupStore';
+import { useInstallStore } from '../../pwa/install';
 import { AutoBackupSettings } from './AutoBackupSettings';
 
 let enableMock: ReturnType<typeof vi.fn<() => Promise<void>>>;
@@ -37,6 +38,7 @@ beforeEach(() => {
     disable: disableMock,
     backupNow: backupNowMock,
   });
+  useInstallStore.setState({ installed: true, deferred: null });
 });
 
 afterEach(() => {
@@ -44,13 +46,19 @@ afterEach(() => {
 });
 
 describe('AutoBackupSettings', () => {
+  it('is hidden outside the installed app', () => {
+    useInstallStore.setState({ installed: false });
+    const { container } = render(<AutoBackupSettings />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('explains the manual fallback in unsupported browsers', () => {
     useBackupStore.setState({ status: 'unsupported' });
     render(<AutoBackupSettings />);
 
     expect(screen.getByText('Not supported')).toBeInTheDocument();
     expect(screen.getByText(/cannot overwrite a file automatically/i)).toBeInTheDocument();
-    expect(screen.getByText(/desktop Chrome or Edge/)).toBeInTheDocument();
+    expect(screen.getByText(/Use Export below/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Enable' })).not.toBeInTheDocument();
   });
 

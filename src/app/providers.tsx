@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { ToastHost } from '../components/ui/Toast';
 import { UpdateToast } from '../pwa/UpdateToast';
-import { useInstallCapture } from '../pwa/install';
+import { useInstallCapture, useInstallStore } from '../pwa/install';
 import { initAutoBackup } from '../store/useBackupStore';
 
 function applyTheme(theme: 'system' | 'light' | 'dark', accent: string) {
@@ -19,8 +19,9 @@ function applyTheme(theme: 'system' | 'light' | 'dark', accent: string) {
 export function Providers({ children }: { children: ReactNode }) {
   const theme = useAppStore((s) => s.settings.theme);
   const accent = useAppStore((s) => s.settings.accent);
+  const installed = useInstallStore((s) => s.installed);
   useInstallCapture();
-  useEffect(() => initAutoBackup(), []);
+  useEffect(() => initAutoBackup(), [installed]);
 
   useEffect(() => {
     applyTheme(theme, accent);

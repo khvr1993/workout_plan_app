@@ -3,6 +3,7 @@ import { Upload, Trash2, Smartphone, Github, Check, ExternalLink } from 'lucide-
 import { useAppStore, storage } from '../store/useAppStore';
 import type { AppData, Settings as SettingsType } from '../data/types';
 import { MAX_IMPORT_BYTES, parseImport } from '../lib/export';
+import { isAutoBackupSupported } from '../lib/autoBackup';
 import { BUILD_VERSION } from '../lib/version';
 import { BackupExportButton } from '../components/layout/BackupReminder';
 import { AutoBackupSettings } from '../components/layout/AutoBackupSettings';
@@ -53,6 +54,7 @@ export default function Settings() {
   const meta = useAppStore((s) => s.meta);
   const installDeferred = useInstallStore((s) => s.deferred);
   const installed = useInstallStore((s) => s.installed);
+  const backupSupported = isAutoBackupSupported();
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [pendingImport, setPendingImport] = useState<AppData | null>(null);
@@ -254,8 +256,12 @@ export default function Settings() {
 
       <Section title="Data">
         <p className="mb-3 text-body-sm text-text-muted">
-          Automatic backup keeps one JSON file outside the app and overwrites it daily. A reminder
-          appears every 3 days until a backup exists. Import restores any export.
+          {!installed
+            ? 'Automatic backup is available in the installed app. Until then, export a JSON copy and restore it with Import.'
+            : backupSupported
+              ? 'Automatic backup keeps one JSON file outside the app and overwrites it daily while the app is open. A reminder appears every 3 days until a backup exists.'
+              : 'This browser cannot overwrite a file automatically. Export a JSON copy and keep it in Files or Downloads.'}{' '}
+          Import restores any export.
         </p>
         <AutoBackupSettings />
         <Card className="!py-1 mt-3">

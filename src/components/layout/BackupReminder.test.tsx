@@ -8,6 +8,7 @@ import { downloadJson, parseImport } from '../../lib/export';
 import Settings from '../../screens/Settings';
 import { useAppStore } from '../../store/useAppStore';
 import { useBackupStore } from '../../store/useBackupStore';
+import { useInstallStore } from '../../pwa/install';
 import { useToastStore } from '../ui/Toast';
 import { BackupReminder, REMIND_AFTER_DAYS } from './BackupReminder';
 
@@ -64,6 +65,7 @@ beforeEach(() => {
     enable: enableMock,
     reconnect: reconnectMock,
   });
+  useInstallStore.setState({ installed: true, deferred: null });
 });
 
 afterEach(() => {
@@ -74,6 +76,18 @@ afterEach(() => {
 });
 
 describe('BackupReminder scheduling', () => {
+  it('offers only a manual export outside the installed app', () => {
+    useInstallStore.setState({ installed: false });
+    useBackupStore.setState({ status: 'needs-permission', fileName: 'workout-backup.json' });
+    render(<BackupReminder />);
+
+    expect(reminder()).toBeInTheDocument();
+    expect(screen.getByText('Keep a backup outside this app')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export backup' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Enable auto-backup' })).not.toBeInTheDocument();
+  });
+
   it('shows the reminder when no backup exists, with export and a 3-day snooze', () => {
     render(<BackupReminder />);
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useAppStore } from './useAppStore';
+import { useInstallStore } from '../pwa/install';
 import { buildExport, type ExportFile } from '../lib/export';
 import { todayLocal } from '../lib/date';
 import {
@@ -181,6 +182,13 @@ function dataSlices(state: ReturnType<typeof useAppStore.getState>): unknown[] {
 export function initAutoBackup(): () => void {
   const gen = ++generation;
   let cancelled = false;
+
+  if (!useInstallStore.getState().installed) {
+    useBackupStore.setState({ status: 'off', fileName: null, error: null, busy: false });
+    return () => {
+      cancelled = true;
+    };
+  }
 
   if (!isAutoBackupSupported()) {
     useBackupStore.setState({ status: 'unsupported', fileName: null, error: null, busy: false });

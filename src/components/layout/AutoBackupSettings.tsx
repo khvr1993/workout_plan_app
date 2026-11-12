@@ -2,6 +2,7 @@ import { Download, FolderDown, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useBackupStore, type BackupStatus } from '../../store/useBackupStore';
 import { formatShort, formatTime } from '../../lib/date';
+import { useInstallStore } from '../../pwa/install';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { cn } from '../../lib/cn';
@@ -15,6 +16,7 @@ const STATUS_LABEL: Record<BackupStatus, string> = {
 };
 
 export function AutoBackupSettings() {
+  const installed = useInstallStore((s) => s.installed);
   const status = useBackupStore((s) => s.status);
   const fileName = useBackupStore((s) => s.fileName);
   const error = useBackupStore((s) => s.error);
@@ -25,13 +27,17 @@ export function AutoBackupSettings() {
   const backupNow = useBackupStore((s) => s.backupNow);
   const lastBackupAt = useAppStore((s) => s.meta.lastBackupAt);
 
+  // File access is only worth offering in the installed app: browser tabs
+  // cannot keep the write permission between visits.
+  if (!installed) return null;
+
   const hint =
     status === 'unsupported'
-      ? 'This browser cannot overwrite a file automatically. Use Export below, or open the app in desktop Chrome or Edge.'
+      ? 'This browser cannot overwrite a file automatically. Use Export below.'
       : status === 'off'
         ? 'Pick one file. While the app is open, it is overwritten every day and after your changes.'
         : status === 'needs-permission'
-          ? `Write access to ${fileName ?? 'the backup file'} expired. Reconnect to resume daily backups.`
+          ? `Write access to ${fileName ?? 'the backup file'} expired. Reconnect once; if the browser offers "Allow on every visit", choose it.`
           : status === 'error'
             ? (error ?? 'The last automatic backup failed.')
             : busy
