@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: '/workout_plan_app/',
+  base: process.env.VERCEL === '1' ? '/' : '/workout_plan_app/',
   plugins: [
     react(),
     tailwindcss(),
