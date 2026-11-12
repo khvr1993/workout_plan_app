@@ -364,7 +364,7 @@ export default function Settings() {
             hint="Public-domain form photos, bundled for offline use."
             control={
               <a
-                href="https://github.com/yuhonas/free-exercise-db"
+                href="https://yuhonas.github.io/free-exercise-db/"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex h-9 items-center gap-1.5 rounded-sm border border-border bg-surface-2 px-3 text-[13px] font-medium text-text hover:border-border-strong transition-colors"

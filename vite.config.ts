@@ -9,7 +9,8 @@ const packageVersion = (
     version: string;
   }
 ).version;
-const buildStamp = `${packageVersion} · ${new Date().toISOString().slice(0, 10)}`;
+const buildTimestamp = new Date().toISOString().slice(0, 19) + 'Z';
+const buildStamp = `${packageVersion} · ${buildTimestamp}`;
 
 export default defineConfig({
   // Relative URLs keep one build valid at a domain root (Vercel) and under a
