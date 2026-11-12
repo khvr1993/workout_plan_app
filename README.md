@@ -52,7 +52,11 @@ npm run dev        # dev server (served under /workout_plan_app/)
 
 Pushing to `main` triggers `.github/workflows/deploy.yml`: tests → build → deploy. One-time repo setup: **Settings → Pages → Source: GitHub Actions**.
 
-The app is configured for project Pages: `base: '/workout_plan_app/'` and a `HashRouter`, so deep links never 404 and no SPA shim is needed. To deploy under a different repo name or a custom domain, change `base` in `vite.config.ts` (use `'/'` for a root domain).
+The build uses a relative `base: './'`, so the same `dist` works at a domain root (Vercel, custom domains) and under a repository subpath (project Pages) with no config change. A `HashRouter` keeps the document URL fixed, so asset and service-worker URLs stay valid and deep links never 404.
+
+## Deployment (Vercel)
+
+Import the repository with framework **Vite** (or use the committed `vercel.json`), build `npm run build`, output `dist`, root directory empty. Every push to `main` builds automatically; open the newest deployment rather than redeploying an older one.
 
 ## Offline & install
 

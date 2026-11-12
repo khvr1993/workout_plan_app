@@ -4,7 +4,9 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: process.env.VERCEL === '1' ? '/' : '/workout_plan_app/',
+  // Relative URLs keep one build valid at a domain root (Vercel) and under a
+  // repository subpath (GitHub Pages); HashRouter keeps the document URL fixed.
+  base: './',
   plugins: [
     react(),
     tailwindcss(),
