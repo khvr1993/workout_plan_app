@@ -4,6 +4,7 @@ import { useAppStore, storage } from '../store/useAppStore';
 import type { AppData, Settings as SettingsType } from '../data/types';
 import { parseImport } from '../lib/export';
 import { BackupExportButton } from '../components/layout/BackupReminder';
+import { AutoBackupSettings } from '../components/layout/AutoBackupSettings';
 import { PageHeader, Section } from '../components/layout/AppShell';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -248,16 +249,16 @@ export default function Settings() {
 
       <Section title="Data">
         <p className="mb-3 text-body-sm text-text-muted">
-          A daily reminder appears until you export or choose “Remind me tomorrow.” Save the JSON file
-          in Files or Downloads, then use Import to restore it. Backups do not run while the app is closed;
-          the app cannot confirm that a download was saved.
+          Automatic backup keeps one JSON file outside the app and overwrites it daily. A reminder
+          appears every 3 days until a backup exists. Import restores any export.
         </p>
-        <Card className="!py-1">
+        <AutoBackupSettings />
+        <Card className="!py-1 mt-3">
           <Row
             label="Export"
             hint={
               meta.lastBackupAt
-                ? `Last export requested ${formatShort(meta.lastBackupAt)}`
+                ? `Last backup ${formatShort(meta.lastBackupAt)}`
                 : 'Download everything as JSON.'
             }
             control={<BackupExportButton label="Export" />}

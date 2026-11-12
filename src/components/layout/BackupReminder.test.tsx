@@ -7,8 +7,9 @@ import type { AppData, Meta } from '../../data/types';
 import { downloadJson, parseImport } from '../../lib/export';
 import Settings from '../../screens/Settings';
 import { useAppStore } from '../../store/useAppStore';
+import { useBackupStore } from '../../store/useBackupStore';
 import { useToastStore } from '../ui/Toast';
-import { BackupReminder } from './BackupReminder';
+import { BackupReminder, REMIND_AFTER_DAYS } from './BackupReminder';
 
 vi.mock('../../lib/export', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/export')>();
@@ -36,8 +37,15 @@ function storedMeta(): Envelope<Meta> {
 }
 
 function reminder() {
-  return screen.queryByRole('region', { name: 'Daily backup' });
+  return screen.queryByRole('region', { name: 'Backup reminder' });
 }
+
+function daysAgoLocal(days: number, hour = 10): string {
+  return new Date(2026, 0, 15 - days, hour).toISOString();
+}
+
+let enableMock: ReturnType<typeof vi.fn<() => Promise<void>>>;
+let reconnectMock: ReturnType<typeof vi.fn<() => Promise<void>>>;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -46,6 +54,16 @@ beforeEach(() => {
   download.mockReset();
   resetStore();
   useToastStore.setState({ toasts: [] });
+  enableMock = vi.fn(async () => {});
+  reconnectMock = vi.fn(async () => {});
+  useBackupStore.setState({
+    status: 'unsupported',
+    fileName: null,
+    error: null,
+    busy: false,
+    enable: enableMock,
+    reconnect: reconnectMock,
+  });
 });
 
 afterEach(() => {
@@ -55,43 +73,45 @@ afterEach(() => {
   useToastStore.setState({ toasts: [] });
 });
 
-describe('BackupReminder', () => {
-  it('offers a one-tap JSON backup when there has been no previous export', () => {
+describe('BackupReminder scheduling', () => {
+  it('shows the reminder when no backup exists, with export and a 3-day snooze', () => {
     render(<BackupReminder />);
 
     expect(reminder()).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export backup' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Remind me tomorrow' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Remind me in 3 days' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Enable auto-backup' })).not.toBeInTheDocument();
     expect(screen.getByText(/Save a JSON copy to Files or Downloads/)).toBeInTheDocument();
-    expect(useAppStore.getState().meta.lastBackupAt).toBeUndefined();
+    expect(REMIND_AFTER_DAYS).toBe(3);
     expect(download).not.toHaveBeenCalled();
   });
 
-  it('suppresses the reminder for an export earlier on the same local day', () => {
-    vi.setSystemTime(new Date(2026, 0, 15, 23, 59));
-    useAppStore.getState().markBackup(new Date(2026, 0, 15, 0, 1).toISOString());
-
+  it('offers to enable automatic backup when the browser supports it', () => {
+    useBackupStore.setState({ status: 'off' });
     render(<BackupReminder />);
 
+    fireEvent.click(screen.getByRole('button', { name: 'Enable auto-backup' }));
+
+    expect(enableMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/overwrite one file daily/i)).toBeInTheDocument();
+  });
+
+  it.each([0, 1, 2])('stays hidden %i day(s) after the last backup', (days) => {
+    useAppStore.getState().markBackup(daysAgoLocal(days));
+    render(<BackupReminder />);
     expect(reminder()).not.toBeInTheDocument();
-    expect(download).not.toHaveBeenCalled();
   });
 
-  it('is due after local midnight even when yesterday’s export was only two minutes ago', () => {
-    vi.setSystemTime(new Date(2026, 0, 15, 0, 1));
-    useAppStore.getState().markBackup(new Date(2026, 0, 14, 23, 59).toISOString());
-
+  it.each([3, 10])('returns %i days after the last backup', (days) => {
+    useAppStore.getState().markBackup(daysAgoLocal(days));
     render(<BackupReminder />);
-
     expect(reminder()).toBeInTheDocument();
-    expect(download).not.toHaveBeenCalled();
   });
 
-  it('persists a dismissal as a local date and stays dismissed after restoring it and remounting', () => {
-    vi.setSystemTime(new Date(2026, 0, 15, 23, 59));
+  it('persists a dismissal as a local date and stays hidden after restoring it and remounting', () => {
     const { unmount } = render(<BackupReminder />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remind me tomorrow' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remind me in 3 days' }));
 
     expect(reminder()).not.toBeInTheDocument();
     expect(useAppStore.getState().meta.backupReminderDismissedOn).toBe('2026-01-15');
@@ -104,7 +124,6 @@ describe('BackupReminder', () => {
 
     unmount();
     resetStore();
-    // Restore the serialized meta rather than relying only on the live store.
     useAppStore.setState({ meta: persisted.value });
     render(<BackupReminder />);
 
@@ -112,41 +131,62 @@ describe('BackupReminder', () => {
     expect(download).not.toHaveBeenCalled();
   });
 
-  it.each(['dismissal', 'export'] as const)(
-    'returns exactly at local midnight after a same-day %s and schedules the following midnight',
-    (reason) => {
-      vi.setSystemTime(new Date(2026, 0, 15, 23, 59, 59, 500));
-      if (reason === 'export') {
-        useAppStore.getState().markBackup(new Date().toISOString());
-      }
-      render(<BackupReminder />);
-      if (reason === 'dismissal') {
-        fireEvent.click(screen.getByRole('button', { name: 'Remind me tomorrow' }));
-      }
+  it.each([1, 2])('stays hidden %i day(s) after a dismissal', (days) => {
+    useAppStore.setState({
+      meta: { ...defaultMeta(), backupReminderDismissedOn: daysAgoLocal(days).slice(0, 10) },
+    });
+    render(<BackupReminder />);
+    expect(reminder()).not.toBeInTheDocument();
+  });
 
-      act(() => vi.advanceTimersByTime(499));
-      expect(reminder()).not.toBeInTheDocument();
-      act(() => vi.advanceTimersByTime(1));
-      expect(new Date()).toEqual(new Date(2026, 0, 16));
-      expect(reminder()).toBeInTheDocument();
+  it.each([3, 5])('returns %i days after a dismissal', (days) => {
+    useAppStore.setState({
+      meta: { ...defaultMeta(), backupReminderDismissedOn: daysAgoLocal(days).slice(0, 10) },
+    });
+    render(<BackupReminder />);
+    expect(reminder()).toBeInTheDocument();
+  });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Remind me tomorrow' }));
-      expect(storedMeta().value.backupReminderDismissedOn).toBe('2026-01-16');
-      expect(reminder()).not.toBeInTheDocument();
-      const untilNextMidnight = new Date(2026, 0, 17).getTime() - Date.now();
-      act(() => vi.advanceTimersByTime(untilNextMidnight));
-      expect(reminder()).toBeInTheDocument();
-      expect(download).not.toHaveBeenCalled();
-    },
-  );
+  it('snoozes across midnight and returns exactly three local days after each dismissal', () => {
+    vi.setSystemTime(new Date(2026, 0, 15, 23, 59, 59, 500));
+    render(<BackupReminder />);
+    fireEvent.click(screen.getByRole('button', { name: 'Remind me in 3 days' }));
+
+    act(() => vi.advanceTimersByTime(500));
+    expect(new Date()).toEqual(new Date(2026, 0, 16));
+    expect(reminder()).not.toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(new Date(2026, 0, 18).getTime() - Date.now()));
+    expect(reminder()).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remind me in 3 days' }));
+    expect(storedMeta().value.backupReminderDismissedOn).toBe('2026-01-18');
+    expect(reminder()).not.toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(new Date(2026, 0, 21).getTime() - Date.now()));
+    expect(reminder()).toBeInTheDocument();
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('returns at local midnight three days after the last backup, not before', () => {
+    vi.setSystemTime(new Date(2026, 0, 15, 23, 59, 59, 500));
+    useAppStore.getState().markBackup(new Date(2026, 0, 15, 0, 1).toISOString());
+    render(<BackupReminder />);
+
+    act(() => vi.advanceTimersByTime(500));
+    expect(new Date()).toEqual(new Date(2026, 0, 16));
+    expect(reminder()).not.toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(new Date(2026, 0, 18).getTime() - Date.now()));
+    expect(reminder()).toBeInTheDocument();
+  });
 
   it.each([
     { event: 'focus', reason: 'dismissal' },
     { event: 'visibilitychange', reason: 'dismissal' },
-    { event: 'focus', reason: 'export' },
-    { event: 'visibilitychange', reason: 'export' },
-  ])('refreshes a same-day $reason on $event after resuming the next day', ({ event, reason }) => {
-    if (reason === 'export') {
+    { event: 'focus', reason: 'backup' },
+    { event: 'visibilitychange', reason: 'backup' },
+  ])('refreshes on $event after resuming three days past a same-day $reason', ({ event, reason }) => {
+    if (reason === 'backup') {
       useAppStore.getState().markBackup(new Date().toISOString());
     } else {
       useAppStore.getState().dismissBackupReminder();
@@ -155,7 +195,7 @@ describe('BackupReminder', () => {
     expect(reminder()).not.toBeInTheDocument();
 
     // Move the wall clock without running the midnight timer, as on a suspended tab.
-    act(() => vi.setSystemTime(new Date(2026, 0, 16, 8)));
+    act(() => vi.setSystemTime(new Date(2026, 0, 18, 8)));
     expect(reminder()).not.toBeInTheDocument();
     fireEvent(event === 'focus' ? window : document, new Event(event));
 
@@ -163,23 +203,26 @@ describe('BackupReminder', () => {
     expect(download).not.toHaveBeenCalled();
   });
 
-  it.each(['not-a-date', '2026-99-99', ''])('treats invalid lastBackupAt %j as due without crashing', (lastBackupAt) => {
+  it.each(['not-a-date', '2026-99-99', ''])('treats invalid lastBackupAt %j as stale without crashing', (lastBackupAt) => {
     useAppStore.setState({ meta: { ...defaultMeta(), lastBackupAt } });
-
     expect(() => render(<BackupReminder />)).not.toThrow();
-
     expect(reminder()).toBeInTheDocument();
-    expect(download).not.toHaveBeenCalled();
   });
 
-  it('suppresses the reminder in safe mode without exporting or changing backup metadata', () => {
+  it.each(['garbage', ''])('ignores an invalid dismissal date %j', (dismissedOn) => {
+    useAppStore.setState({ meta: { ...defaultMeta(), backupReminderDismissedOn: dismissedOn } });
+    render(<BackupReminder />);
+    expect(reminder()).toBeInTheDocument();
+  });
+
+  it('suppresses the reminder in safe mode without changing backup metadata', () => {
     const metaBefore = useAppStore.getState().meta;
     const persistedBefore = localStorage.getItem(STORAGE_KEYS.meta);
     useAppStore.setState({ safeMode: true });
     render(<BackupReminder />);
 
     expect(reminder()).not.toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(new Date(2026, 0, 16).getTime() - Date.now()));
+    act(() => vi.advanceTimersByTime(new Date(2026, 0, 20).getTime() - Date.now()));
     fireEvent.focus(window);
     fireEvent(document, new Event('visibilitychange'));
     expect(reminder()).not.toBeInTheDocument();
@@ -189,6 +232,45 @@ describe('BackupReminder', () => {
 
     act(() => useAppStore.setState({ safeMode: false }));
     expect(reminder()).toBeInTheDocument();
+  });
+
+  it('stays hidden while automatic backup is on, even with stale backup metadata', () => {
+    useBackupStore.setState({ status: 'on', fileName: 'workout-backup.json' });
+    render(<BackupReminder />);
+    expect(reminder()).not.toBeInTheDocument();
+
+    act(() => useBackupStore.setState({ status: 'off' }));
+    expect(reminder()).toBeInTheDocument();
+  });
+
+  it('shows a reconnect action when automatic backup lost write permission', () => {
+    useBackupStore.setState({ status: 'needs-permission', fileName: 'workout-backup.json' });
+    render(<BackupReminder />);
+
+    expect(screen.getByText('Automatic backup is paused')).toBeInTheDocument();
+    expect(screen.getByText(/workout-backup\.json/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+    expect(reconnectMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Export backup' })).toBeEnabled();
+  });
+
+  it('surfaces the automatic backup error and points at Settings', () => {
+    useBackupStore.setState({
+      status: 'error',
+      error: 'The backup file could not be found. Choose it again.',
+    });
+    render(<BackupReminder />);
+
+    expect(screen.getByText('Automatic backup needs attention')).toBeInTheDocument();
+    expect(screen.getByText(/could not be found/)).toBeInTheDocument();
+    expect(screen.getByText(/Settings → Data/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument();
+  });
+
+  it('disables automation actions while a backup write is in flight', () => {
+    useBackupStore.setState({ status: 'off', busy: true });
+    render(<BackupReminder />);
+    expect(screen.getByRole('button', { name: 'Enable auto-backup' })).toBeDisabled();
   });
 
   it('cleans up its midnight timer and foreground listeners on unmount', () => {
@@ -228,8 +310,8 @@ describe('BackupExportButton', () => {
     useAppStore.setState({
       meta: {
         ...useAppStore.getState().meta,
-        lastBackupAt: new Date(2026, 0, 14, 10).toISOString(),
-        backupReminderDismissedOn: '2026-01-14',
+        lastBackupAt: new Date(2026, 0, 10, 10).toISOString(),
+        backupReminderDismissedOn: '2026-01-10',
       },
     });
     render(<BackupReminder />);
@@ -285,7 +367,7 @@ describe('BackupExportButton', () => {
     expect(reminder()).not.toBeInTheDocument();
   });
 
-  it.each([undefined, new Date(2026, 0, 14, 10).toISOString()])(
+  it.each([undefined, new Date(2026, 0, 10, 10).toISOString()])(
     'does not mark a backup or hide the reminder when download initiation fails (previous: %s)',
     (lastBackupAt) => {
       useAppStore.setState({ meta: { ...defaultMeta(), lastBackupAt } });
@@ -335,7 +417,7 @@ describe('BackupExportButton', () => {
     expect(storedMeta().value.lastBackupAt).toBe(exportedAt);
     expect(reminder()).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled();
-    expect(screen.getByText(/Last export requested/)).toBeInTheDocument();
+    expect(screen.getByText(/Last backup/)).toBeInTheDocument();
 
     unmount();
     render(<BackupReminder />);

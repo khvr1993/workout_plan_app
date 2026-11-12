@@ -14,5 +14,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // user-event flows are CPU-heavy; a short timeout aborts mid-flow and its
+    // queued events leak into the next test, cascading spurious failures.
+    testTimeout: 20_000,
+    hookTimeout: 20_000,
   },
 });

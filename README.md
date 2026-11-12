@@ -70,6 +70,8 @@ Import the repository with framework **Vite** (or use the committed `vercel.json
 - Sessions snapshot exercise names, targets and the unit used at logging time — editing the program or switching kg/lb never rewrites history. Internally, stats normalize to kg.
 - Storage is versioned (`v3` envelopes) with a migration chain. Data written by a newer app version opens in read-only safe mode with an export prompt instead of being corrupted.
 - **Settings → Data** offers JSON export, validated import (zod — a bad file fails loudly and changes nothing), storage usage, and a two-step clear-all.
+- **Automatic backup** (desktop Chrome/Edge): pick one file once in Settings → Data and the app overwrites it daily while open, and shortly after your data changes. The file handle lives in IndexedDB; if write permission expires, the app pauses and offers a one-tap reconnect. Other browsers keep the manual export.
+- A reminder card appears at most every 3 days until a backup exists (or automatic backup is on); “Remind me in 3 days” snoozes it.
 - In-progress sessions survive refresh, backgrounding and app kills; rest timers are stored as end-timestamps so they stay accurate while the app is backgrounded.
 
 ## Design
@@ -86,7 +88,7 @@ src/
 │                SessionDetail · Progress · ExerciseProgress · Settings
 ├─ data/         types · program seed · form demos · zod schemas · storage · migrations
 ├─ store/        zustand store + selectors (persisted via storage adapter)
-├─ lib/          stats · progression · volume · units · export · date
+├─ lib/          stats · progression · volume · units · export · autoBackup · date
 ├─ styles/       design tokens + globals (Tailwind v4 @theme)
 └─ pwa/          service-worker registration, update toast, install capture
 ```
