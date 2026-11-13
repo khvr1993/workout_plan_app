@@ -1,5 +1,5 @@
 import type { Meta, Program, Session, SetEntry } from '../data/types';
-import { daysBetween, inWeek, todayLocal, weekWindow } from './date';
+import { daysBetween, inWeek, parseLocal, todayLocal, weekWindow } from './date';
 import { fromDisplay } from './units';
 import { addDays } from 'date-fns';
 
@@ -26,15 +26,18 @@ export function sessionsThisWeek(sessions: Session[], weekStartsOn: 0 | 1, ancho
 }
 
 export function weeklyStreak(sessions: Session[], weeklyTarget: number, weekStartsOn: 0 | 1): number {
+  if (!Number.isFinite(weeklyTarget) || weeklyTarget < 1) return 0;
   const done = completedStrength(sessions);
   if (done.length === 0) return 0;
+  const earliestDate = done[done.length - 1].date;
+  const earliestWindowStart = weekWindow(parseLocal(earliestDate), weekStartsOn).start;
   let streak = 0;
   let anchor = new Date();
   // The current week only counts once it hits the target; otherwise start from last week.
   if (sessionsThisWeek(done, weekStartsOn, anchor).length < weeklyTarget) {
     anchor = addDays(anchor, -7);
   }
-  for (;;) {
+  while (weekWindow(anchor, weekStartsOn).end >= earliestWindowStart) {
     const count = sessionsThisWeek(done, weekStartsOn, anchor).length;
     if (count >= weeklyTarget) {
       streak++;

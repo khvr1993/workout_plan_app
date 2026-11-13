@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
 
+let activeOverlayLocks = 0;
+let savedBodyOverflow = '';
+
 /** Escape-to-close, body scroll lock, and focus restore for overlays. */
 export function useOverlay(open: boolean, onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null);
@@ -9,8 +12,11 @@ export function useOverlay(open: boolean, onClose: () => void) {
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (activeOverlayLocks === 0) {
+      savedBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
+    activeOverlayLocks += 1;
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -42,9 +48,14 @@ export function useOverlay(open: boolean, onClose: () => void) {
     }, 50);
     return () => {
       document.removeEventListener('keydown', onKey, true);
-      document.body.style.overflow = prevOverflow;
+      activeOverlayLocks = Math.max(0, activeOverlayLocks - 1);
+      if (activeOverlayLocks === 0) {
+        document.body.style.overflow = savedBodyOverflow;
+      }
       window.clearTimeout(t);
-      previous?.focus?.();
+      if (previous?.isConnected) {
+        previous.focus?.();
+      }
     };
   }, [open]);
 

@@ -238,6 +238,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   startSession: (dayId) => {
     const state = get();
+    if (state.safeMode) throw new Error('Cannot start a session while storage is read-only.');
     const existing = state.sessions.find((s) => s.status === 'in-progress' && s.dayId === dayId);
     if (existing) return existing;
     const session = buildSession(dayId, state);

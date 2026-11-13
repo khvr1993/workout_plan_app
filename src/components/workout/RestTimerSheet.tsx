@@ -17,10 +17,11 @@ export function RestTimerSheet() {
 
   const active = restEndsAt != null;
   useEffect(() => {
-    if (!active) return;
+    if (restEndsAt == null) return;
+    setNow(Date.now());
     const t = window.setInterval(() => setNow(Date.now()), 200);
     return () => window.clearInterval(t);
-  }, [active]);
+  }, [restEndsAt]);
 
   const remaining = restEndsAt != null ? Math.max(0, (restEndsAt - now) / 1000) : 0;
 

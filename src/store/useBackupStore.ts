@@ -117,6 +117,22 @@ function backedUpToday(): boolean {
   return !Number.isNaN(d.getTime()) && todayLocal(d) === todayLocal();
 }
 
+const WRITE_TIMEOUT_MS = 15_000;
+
+async function writeWithTimeout(h: BackupFileHandle, payload: ExportFile): Promise<void> {
+  let timer: number | undefined;
+  try {
+    await Promise.race([
+      writeBackupFile(h, payload),
+      new Promise<never>((_, reject) => {
+        timer = window.setTimeout(() => reject(new Error('Backup write timed out.')), WRITE_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) window.clearTimeout(timer);
+  }
+}
+
 async function writeNow(): Promise<void> {
   const h = handle;
   if (!h || useAppStore.getState().safeMode) return;
@@ -129,7 +145,7 @@ async function writeNow(): Promise<void> {
   useBackupStore.setState({ busy: true });
   try {
     const payload = buildSnapshot();
-    await writeBackupFile(h, payload);
+    await writeWithTimeout(h, payload);
     if (gen !== generation) return;
     useAppStore.getState().markBackup(payload.exportedAt);
     useBackupStore.setState({ status: 'on', error: null, busy: false, fileName: h.name });
@@ -152,10 +168,12 @@ async function writeNow(): Promise<void> {
       });
     }
   } finally {
-    writing = false;
-    if (pendingWrite && gen === generation) {
-      pendingWrite = false;
-      if (useBackupStore.getState().status === 'on') void writeNow();
+    if (gen === generation) {
+      writing = false;
+      if (pendingWrite) {
+        pendingWrite = false;
+        if (useBackupStore.getState().status === 'on') void writeNow();
+      }
     }
   }
 }
@@ -238,8 +256,11 @@ export function initAutoBackup(): () => void {
       }
     })();
   };
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') onResume();
+  };
   window.addEventListener('focus', onResume);
-  document.addEventListener('visibilitychange', onResume);
+  document.addEventListener('visibilitychange', onVisibilityChange);
   scheduleMidnight();
 
   let prev = dataSlices(useAppStore.getState());
@@ -256,7 +277,7 @@ export function initAutoBackup(): () => void {
     cancelled = true;
     generation++;
     window.removeEventListener('focus', onResume);
-    document.removeEventListener('visibilitychange', onResume);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
     window.clearTimeout(midnightTimer);
     window.clearTimeout(debounceTimer);
     unsubscribe();

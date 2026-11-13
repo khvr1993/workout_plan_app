@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Unit } from '../../data/types';
 import { formatWeightNumber, toDisplay } from '../../lib/units';
 import { cn } from '../../lib/cn';
@@ -53,6 +53,7 @@ export function WeightPicker({ options, value, unit, onChange, label }: WeightPi
       pressTimer.current = null;
     }
   };
+  useEffect(() => cancelPress, []);
 
   if (options.length === 0) {
     return <span className="text-body-sm text-text-muted">Bodyweight</span>;
@@ -75,6 +76,7 @@ export function WeightPicker({ options, value, unit, onChange, label }: WeightPi
           onPointerDown={startPress}
           onPointerUp={cancelPress}
           onPointerLeave={cancelPress}
+          onPointerCancel={cancelPress}
           onContextMenu={(e) => e.preventDefault()}
           className={cn(
             'h-11 min-w-11 px-2 rounded-sm border text-[13px] font-medium tnum transition-colors duration-150 cursor-pointer select-none',

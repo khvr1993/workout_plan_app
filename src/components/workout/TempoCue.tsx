@@ -21,7 +21,8 @@ export function TempoCue({
   metronomeEnabled: boolean;
 }) {
   const tempo = tempoString(exercise, prog);
-  const eccentric = tempo ? parseInt(tempo.split('-')[0], 10) : 2;
+  const parsedEccentric = tempo ? Number.parseInt(tempo.split('-')[0], 10) : 2;
+  const eccentric = Number.isFinite(parsedEccentric) && parsedEccentric > 0 ? parsedEccentric : 2;
   const { active, toggle } = useMetronome(eccentric);
   if (!tempo) return null;
   return (

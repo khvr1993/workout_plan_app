@@ -43,7 +43,6 @@ export function Session() {
 
   const [confirmClose, setConfirmClose] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
-  const [now, setNow] = useState(Date.now());
   const finishing = useRef(false);
 
   useEffect(() => {
@@ -51,11 +50,6 @@ export function Session() {
       startSession(day.id);
     }
   }, [day, session, otherDayId, startSession, safeMode]);
-
-  useEffect(() => {
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, []);
 
   if (!day) return <Navigate to="/program" replace />;
 
@@ -98,13 +92,12 @@ export function Session() {
   }
 
   const startedAt = new Date(session.startedAt).getTime();
-  const elapsedSec = Number.isFinite(startedAt)
-    ? Math.max(0, (now - startedAt) / 1000)
-    : 0;
-  const elapsedMin = Math.min(
-    LIMITS.maxDurationMin,
-    Math.max(1, Math.round(elapsedSec / 60)),
-  );
+  const elapsedMin = Number.isFinite(startedAt)
+    ? Math.min(
+        LIMITS.maxDurationMin,
+        Math.max(1, Math.round(Math.max(0, (Date.now() - startedAt) / 1000) / 60)),
+      )
+    : 1;
 
   const restForBlock = (blockLog: { restSeconds: number; exercises: Array<{ exerciseId: string }> }) =>
     effectiveRestSeconds(
@@ -172,9 +165,7 @@ export function Session() {
           </IconButton>
           <div className="flex-1 min-w-0">
             <span className="text-h3 text-text">{day.label}</span>
-            <span className="text-body-sm text-text-muted ml-2 tnum" aria-label="Elapsed time">
-              {formatClock(elapsedSec)}
-            </span>
+            <ElapsedClock startedAt={session.startedAt} />
           </div>
           <Button variant="primary" size="sm" onClick={() => setFinishOpen(true)}>
             Finish
@@ -219,6 +210,7 @@ export function Session() {
         open={confirmClose}
         onClose={() => setConfirmClose(false)}
         onConfirm={() => {
+          finishing.current = true;
           abandonSession(session.id);
           navigate('/', { replace: true });
         }}
@@ -228,5 +220,20 @@ export function Session() {
         danger
       />
     </div>
+  );
+}
+
+function ElapsedClock({ startedAt }: { startedAt: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const startMs = new Date(startedAt).getTime();
+  const elapsedSec = Number.isFinite(startMs) ? Math.max(0, (now - startMs) / 1000) : 0;
+  return (
+    <span className="text-body-sm text-text-muted ml-2 tnum" aria-label="Elapsed time">
+      {formatClock(elapsedSec)}
+    </span>
   );
 }

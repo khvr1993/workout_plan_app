@@ -18,12 +18,15 @@ export function Sheet({ open, onClose, title, children, hideClose }: SheetProps)
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+        <motion.div
+          key="sheet-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+        >
+          <div
             className="absolute inset-0"
             style={{ background: 'var(--backdrop)' }}
             onClick={onClose}
@@ -36,7 +39,6 @@ export function Sheet({ open, onClose, title, children, hideClose }: SheetProps)
             aria-label={title}
             initial={{ opacity: 0, transform: 'translateY(16px)' }}
             animate={{ opacity: 1, transform: 'translateY(0)' }}
-            exit={{ opacity: 0, transform: 'translateY(16px)' }}
             transition={{ duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}
             className="relative w-full sm:max-w-md max-h-[85dvh] overflow-y-auto rounded-t-md sm:rounded-md border border-border bg-surface safe-bottom"
             style={{ boxShadow: 'var(--overlay-shadow)' }}
@@ -53,7 +55,7 @@ export function Sheet({ open, onClose, title, children, hideClose }: SheetProps)
             )}
             <div className="px-5 pb-5">{children}</div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

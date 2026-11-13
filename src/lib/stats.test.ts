@@ -98,6 +98,12 @@ describe('weekly stats', () => {
     expect(weeklyStreak([], 3, 1)).toBe(0);
   });
 
+  it('streak returns zero safely when weeklyTarget is non-positive', () => {
+    const sessions = [makeSession({ date: todayLocal() })];
+    expect(weeklyStreak(sessions, 0, 1)).toBe(0);
+    expect(weeklyStreak(sessions, -2, 1)).toBe(0);
+  });
+
   it('daysSinceLast uses the most recent completed strength session', () => {
     const sessions = [
       makeSession({ date: addDaysLocal(todayLocal(), -6) }),

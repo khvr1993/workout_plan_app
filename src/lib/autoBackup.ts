@@ -70,17 +70,33 @@ const DB_VERSION = 1;
 const STORE = 'handles';
 const HANDLE_KEY = 'backup-file';
 
+const IDB_OPEN_TIMEOUT_MS = 5_000;
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error('Backup storage timed out.'));
+    }, IDB_OPEN_TIMEOUT_MS);
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      fn();
+    };
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE)) {
         request.result.createObjectStore(STORE);
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Could not open backup storage.'));
-    request.onblocked = () => reject(new Error('Backup storage is blocked by another tab.'));
+    request.onsuccess = () => finish(() => resolve(request.result));
+    request.onerror = () =>
+      finish(() => reject(request.error ?? new Error('Could not open backup storage.')));
+    request.onblocked = () =>
+      finish(() => reject(new Error('Backup storage is blocked by another tab.')));
   });
 }
 
